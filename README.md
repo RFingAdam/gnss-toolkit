@@ -44,13 +44,14 @@ A comprehensive **Python** suite for automated GNSS testing, logging, and perfor
     ```
 
 ---
+
 ## 🔧 Installation
 
 1. **Clone the repository**
    ```bash
    git clone https://github.com/RFingAdam/gnss-toolkit
    cd gnss-toolkit
-````
+```
 
 2. **Install dependencies**
 
