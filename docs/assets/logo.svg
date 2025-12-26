@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <circle cx="60" cy="60" r="55" fill="#1a1a1a" stroke="#333" stroke-width="2"/>
+  <!-- Satellite body -->
+  <rect x="50" y="35" width="20" height="15" rx="2" fill="url(#cyanGradient)"/>
+  <!-- Solar panels -->
+  <rect x="25" y="38" width="22" height="9" rx="1" fill="url(#cyanGradient)" opacity="0.8"/>
+  <rect x="73" y="38" width="22" height="9" rx="1" fill="url(#cyanGradient)" opacity="0.8"/>
+  <!-- Panel lines -->
+  <line x1="32" y1="38" x2="32" y2="47" stroke="#1a1a1a" stroke-width="0.5"/>
+  <line x1="39" y1="38" x2="39" y2="47" stroke="#1a1a1a" stroke-width="0.5"/>
+  <line x1="80" y1="38" x2="80" y2="47" stroke="#1a1a1a" stroke-width="0.5"/>
+  <line x1="87" y1="38" x2="87" y2="47" stroke="#1a1a1a" stroke-width="0.5"/>
+  <!-- Antenna -->
+  <line x1="60" y1="50" x2="60" y2="58" stroke="url(#cyanGradient)" stroke-width="2"/>
+  <!-- Signal arcs -->
+  <path d="M45 65 Q60 55 75 65" fill="none" stroke="url(#cyanGradient)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M38 75 Q60 60 82 75" fill="none" stroke="url(#cyanGradient)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <path d="M32 85 Q60 65 88 85" fill="none" stroke="url(#cyanGradient)" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <!-- Ground marker -->
+  <circle cx="60" cy="92" r="4" fill="url(#cyanGradient)"/>
+  <circle cx="60" cy="92" r="2" fill="#1a1a1a"/>
+  <!-- Orbit indicators -->
+  <circle cx="30" cy="28" r="2" fill="url(#cyanGradient)" opacity="0.5"/>
+  <circle cx="90" cy="28" r="2" fill="url(#cyanGradient)" opacity="0.5"/>
+  <circle cx="20" cy="55" r="2" fill="url(#cyanGradient)" opacity="0.5"/>
+  <circle cx="100" cy="55" r="2" fill="url(#cyanGradient)" opacity="0.5"/>
+  <!-- Accent ring -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="url(#cyanGradient)" stroke-width="2" opacity="0.4"/>
+</svg>
