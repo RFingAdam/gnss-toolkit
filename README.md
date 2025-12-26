@@ -1,4 +1,21 @@
-# GNSS Logger & Analysis Toolkit
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="GNSS Toolkit" width="120"/>
+</p>
+
+<h1 align="center">GNSS Logger & Analysis Toolkit</h1>
+
+<p align="center">
+  <strong>Automated GNSS testing, logging, and performance analysis suite</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.7+-blue.svg" alt="Python"/>
+  <img src="https://img.shields.io/badge/GNSS-NMEA-green.svg" alt="GNSS"/>
+  <img src="https://img.shields.io/badge/GUI-Tkinter-orange.svg" alt="Tkinter"/>
+  <img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License"/>
+</p>
+
+---
 
 A comprehensive **Python** suite for automated GNSS testing, logging, and performance analysis. Designed for Telit-based modules with standard NMEA output, this toolkit provides:
 
