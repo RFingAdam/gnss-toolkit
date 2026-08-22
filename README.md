@@ -22,16 +22,16 @@ A comprehensive **Python** suite for automated GNSS testing, logging, and perfor
 - **`gnss_logger.py`**  
   Resets & powers-on the GNSS engine, enables NMEA output, and captures raw NMEA sentences to file.  
   **Key functions** inside:
-  - `send_reset(mode)` — sends cold/warm/hot reset via AT command  
-  - `enable_nmea()` — configures which NMEA sentences to output  
-  - `capture_nmea(duration, output_file)` — logs incoming NMEA lines for the specified time  
+  - `send_reset(mode)`: sends cold/warm/hot reset via AT command  
+  - `enable_nmea()`: configures which NMEA sentences to output  
+  - `capture_nmea(duration, output_file)`: logs incoming NMEA lines for the specified time  
 
 - **`gnss_nmea_analysis.py`**  
   Parses a saved NMEA log, computes TTFF, CEP₅₀/₉₅, RMS error, and generates standard plots.  
   **Key functions** inside:
-  - `parse_nmea(nmea_file)` — extracts time, fix quality, lat/lon, HDOP, satellite count  
-  - `haversine(lat1, lon1, lat2, lon2)` — computes great-circle distance  
-  - `main()` (CLI entry point) — handles arguments, computes metrics, writes CSV + PNGs  
+  - `parse_nmea(nmea_file)`: extracts time, fix quality, lat/lon, HDOP, satellite count  
+  - `haversine(lat1, lon1, lat2, lon2)`: computes great-circle distance  
+  - `main()` (CLI entry point): handles arguments, computes metrics, writes CSV + PNGs  
 
 ---
 
@@ -208,9 +208,9 @@ Licensed under the **GNU GPL v3.0**. See [LICENSE](LICENSE) for details.
 
 ## Commercial licensing
 
-This project is licensed under AGPL-3.0-or-later. A commercial license —
-for embedding in a closed-source product, hosting as a paid service
-without AGPL's share-back obligations, or proprietary redistribution —
+This project is licensed under AGPL-3.0-or-later. A commercial license
+(for embedding in a closed-source product, hosting as a paid service
+without AGPL's share-back obligations, or proprietary redistribution)
 is available on a case-by-case basis. See [eng-mcp-suite's licensing
 policy](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md#commercial-licensing)
 or open an issue and tag `@RFingAdam`.
