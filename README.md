@@ -106,7 +106,7 @@ python gnss_logger.py <COM_PORT> [--mode MODE] [--duration SECONDS] [--output FI
 
 | Option        | Description                                                     |
 |---------------|-----------------------------------------------------------------|
-| `<COM_PORT>`  | Serial port, e.g. `COM4` (Windows) or `/dev/ttyUSB0` (Linux/macOS) |
+| `<COM_PORT>`  | Serial port, e.g. `COM4` (Windows) or `/dev/ttyUSB0` (Linux/macOS). If omitted in an interactive terminal, the logger lists detected ports and asks; in scripts/pipes it still errors out |
 | `--mode`      | GNSS start mode: `cold` (default), `warm`, or `hot`             |
 | `--duration`  | Logging duration in seconds (default: `900`)                    |
 | `--output`    | Output filename for the NMEA log (default: `nmea_capture.txt`)  |
