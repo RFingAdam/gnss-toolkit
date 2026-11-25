@@ -9,6 +9,7 @@ All outputs are saved next to the selected NMEA file:
   • scatter_with_cep.png
   • error_vs_hdop.png
   • sats_vs_time.png
+  • dop_vs_time.png         (when the log has GSA sentences)
   • summary_notes.txt        <- added
 
 Distances computed via the Haversine formula on a WGS-84 sphere
@@ -53,6 +54,64 @@ def parse_nmea(nmea_file):
         raise ValueError("No valid GGA sentences found.")
     df['time'] = pd.to_datetime(df['time_str'], format='%H%M%S').dt.time
     return df
+
+
+def _to_float(field):
+    try:
+        return float(field)
+    except (TypeError, ValueError):
+        return np.nan
+
+
+def parse_gsa(nmea_file):
+    """Parse GSA sentences into a DataFrame of PDOP/HDOP/VDOP.
+
+    GSA (NMEA 0183) fields: mode, fix type (1=none, 2=2D, 3=3D), 12 PRN
+    slots, PDOP, HDOP, VDOP and, from NMEA 4.10, an optional system ID.
+    GSA carries no time, so each row is tagged with the UTC time of the
+    most recent GGA/RMC sentence seen before it (empty if none yet).
+    Returns an empty DataFrame when the log has no GSA sentences.
+    """
+    time_pat = re.compile(r'^\$..(GGA|RMC),')
+    gsa_pat = re.compile(r'^\$..GSA,')
+    rows = []
+    last_time = ''
+    with open(nmea_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if time_pat.match(line):
+                t = line.split(',')[1].split('.')[0]
+                if len(t) == 6 and t.isdigit():
+                    last_time = t
+                continue
+            if not gsa_pat.match(line):
+                continue
+            flds = line.split('*')[0].split(',')
+            if len(flds) < 18:
+                continue
+            fix_type = int(flds[2]) if flds[2].isdigit() else 0
+            prns = [p for p in flds[3:15] if p]
+            rows.append({'time_str': last_time,
+                         'mode': flds[1],
+                         'fix_type': fix_type,
+                         'num_used': len(prns),
+                         'pdop': _to_float(flds[15]),
+                         'hdop': _to_float(flds[16]),
+                         'vdop': _to_float(flds[17])})
+    return pd.DataFrame(rows, columns=['time_str', 'mode', 'fix_type',
+                                       'num_used', 'pdop', 'hdop', 'vdop'])
+
+
+def dop_per_epoch(gsa_df):
+    """Collapse multi-constellation GSA rows to one DOP row per epoch.
+
+    Receivers emit one GSA per constellation per epoch with identical DOP
+    values, so the first row with a 2D/3D fix for each time is kept.
+    """
+    if gsa_df.empty:
+        return gsa_df
+    fixed = gsa_df[(gsa_df.fix_type >= 2) & (gsa_df.time_str != '')]
+    return fixed.groupby('time_str', sort=False).first().reset_index()
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -132,6 +191,26 @@ def analyze(path, start_t, lat0, lon0, out_dir=None):
     samp = good[['time_str', 'num_sats', 'hdop', 'error_m']].head(20)
     samp.columns = ['Time', 'Sats', 'HDOP', 'Err(m)']
     summary += samp.to_string(index=False, float_format='%.2f')
+
+    # DOP from GSA (PDOP / HDOP / VDOP)
+    dop = dop_per_epoch(parse_gsa(path))
+    if not dop.empty:
+        summary += (
+            "\n\nDOP from GSA (mean / max):\n"
+            f"PDOP: {dop.pdop.mean():.2f} / {dop.pdop.max():.2f}\n"
+            f"HDOP: {dop.hdop.mean():.2f} / {dop.hdop.max():.2f}\n"
+            f"VDOP: {dop.vdop.mean():.2f} / {dop.vdop.max():.2f}\n"
+        )
+        fig, ax = plt.subplots(figsize=(6,4))
+        dop_times = dop.time_str.astype(int)
+        for col, lbl in (('pdop', 'PDOP'), ('hdop', 'HDOP'), ('vdop', 'VDOP')):
+            ax.plot(dop_times, dop[col], '-o', markersize=3, label=lbl)
+        ax.set(title="Dilution of Precision vs Time (GSA)",
+               xlabel="UTC HHMMSS", ylabel="DOP")
+        ax.grid()
+        ax.legend(fontsize=8)
+        fig.savefig(os.path.join(out_dir, 'dop_vs_time.png'))
+        plt.close(fig)
 
     # Save summary to .txt
     note_file = os.path.join(out_dir, 'summary_notes.txt')
