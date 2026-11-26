@@ -51,12 +51,45 @@ def send_at(ser, cmd, timeout=5.0):
         print(f"⚠️  No OK for '{cmd}' (timeout/error)")
     return ok
 
+def list_serial_ports():
+    """Return the device names of detected serial ports (best effort)."""
+    try:
+        from serial.tools import list_ports
+        return [pt.device for pt in list_ports.comports()]
+    except Exception:
+        return []
+
+
+def prompt_port(input_fn=input, ports=None):
+    """Ask for the serial port on the terminal. Returns None if none given."""
+    if ports is None:
+        ports = list_serial_ports()
+    if ports:
+        print("Detected serial ports:")
+        for i, dev in enumerate(ports, 1):
+            print(f"  {i}) {dev}")
+        q = "Serial port (number or name): "
+    else:
+        q = "Serial port (e.g. COM3 or /dev/ttyUSB0): "
+    try:
+        ans = input_fn(q).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    if ports and ans.isdigit() and 1 <= int(ans) <= len(ports):
+        return ports[int(ans) - 1]
+    return ans or None
+
+
 DEFAULTS = {'port': None, 'mode': 'cold', 'duration': 900,
             'output': 'nmea_capture.txt'}
 
 
-def parse_args(p, argv=None):
-    """Parse CLI args, then fill gaps from --config and the defaults."""
+def parse_args(p, argv=None, stdin=None, input_fn=input):
+    """Parse CLI args, then fill gaps from --config and the defaults.
+
+    A port still missing after that is prompted for, only when stdin is a TTY.
+    """
     args = p.parse_args(argv)
     config = {}
     if args.config:
@@ -70,6 +103,10 @@ def parse_args(p, argv=None):
     for k, v in merged.items():
         setattr(args, k, v)
     if not args.port:
+        stdin = sys.stdin if stdin is None else stdin
+        if stdin is not None and stdin.isatty():
+            args.port = prompt_port(input_fn)
+    if not args.port:
         p.error('the following arguments are required: port '
                 '(give it on the command line or as "port" in --config)')
     return args
@@ -78,7 +115,8 @@ def parse_args(p, argv=None):
 def build_parser():
     p = argparse.ArgumentParser(description="Telit GNSS NMEA Logger")
     p.add_argument('port', nargs='?',
-                   help='Serial port (e.g. COM3); may come from --config')
+                   help='Serial port (e.g. COM3); may come from --config, and is '
+                        'prompted for if still missing in a terminal')
     p.add_argument('--mode', choices=RESET_MAP.keys(), default=None,
                    help='GNSS start mode (cold, warm, hot; default cold)')
     p.add_argument('--duration', type=int, default=None,
