@@ -11,6 +11,7 @@ All outputs are saved next to the selected NMEA file:
   • sats_vs_time.png
   • dop_vs_time.png         (when the log has GSA sentences)
   • snr_per_satellite.png   (when the log has GSV sentences)
+  • velocity_vs_time.png    (when the log has RMC or VTG sentences)
   • summary_notes.txt        <- added
 
 Distances computed via the Haversine formula on a WGS-84 sphere
@@ -216,6 +217,75 @@ def compute_error_stats(errors_m):
     return cep50, cep95, rms
 
 
+KNOTS_TO_KMH = 1.852
+
+
+def parse_velocity(nmea_file):
+    """Parse speed over ground and true track from RMC and VTG sentences.
+
+    RMC (NMEA 0183): time, status (A=valid, V=void), position, speed in
+    knots (field 7), true track in degrees (field 8). Void RMC sentences
+    are skipped. VTG: true track (field 1), magnetic track (3), speed in
+    knots (5) and km/h (7); VTG has no time, so it is tagged with the
+    most recent GGA/RMC time. Returns columns time_str, source,
+    speed_kmh, track_deg (empty DataFrame when neither sentence is present).
+    """
+    time_pat = re.compile(r'^\$..GGA,')
+    rmc_pat = re.compile(r'^\$..RMC,')
+    vtg_pat = re.compile(r'^\$..VTG,')
+    rows = []
+    last_time = ''
+
+    def _time(field):
+        t = field.split('.')[0]
+        return t if len(t) == 6 and t.isdigit() else ''
+
+    with open(nmea_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            flds = line.split('*')[0].split(',')
+            if time_pat.match(line):
+                last_time = _time(flds[1]) or last_time
+            elif rmc_pat.match(line):
+                if len(flds) < 9:
+                    continue
+                t = _time(flds[1])
+                if t:
+                    last_time = t
+                if flds[2] != 'A' or not t:
+                    continue
+                kn = float(flds[7]) if flds[7] else np.nan
+                rows.append({'time_str': t, 'source': 'RMC',
+                             'speed_kmh': kn * KNOTS_TO_KMH,
+                             'track_deg': float(flds[8]) if flds[8] else np.nan})
+            elif vtg_pat.match(line):
+                if len(flds) < 8 or not last_time:
+                    continue
+                if flds[7]:
+                    kmh = float(flds[7])
+                elif flds[5]:
+                    kmh = float(flds[5]) * KNOTS_TO_KMH
+                else:
+                    kmh = np.nan
+                rows.append({'time_str': last_time, 'source': 'VTG',
+                             'speed_kmh': kmh,
+                             'track_deg': float(flds[1]) if flds[1] else np.nan})
+    return pd.DataFrame(rows, columns=['time_str', 'source', 'speed_kmh', 'track_deg'])
+
+
+def velocity_per_epoch(vel_df):
+    """One row per epoch, preferring RMC over VTG when both are present."""
+    if vel_df.empty:
+        return vel_df
+    ranked = vel_df.assign(_rank=(vel_df.source != 'RMC').astype(int))
+    ranked = ranked.dropna(subset=['speed_kmh'])
+    out = (ranked.sort_values('_rank', kind='stable')
+           .groupby('time_str', sort=False).first().reset_index())
+    order = {t: i for i, t in enumerate(dict.fromkeys(vel_df.time_str))}
+    out = out.sort_values('time_str', key=lambda c: c.map(order)).reset_index(drop=True)
+    return out.drop(columns='_rank')
+
+
 def analyze(path, start_t, lat0, lon0, out_dir=None):
     """Run the full TTFF/CEP analysis on an NMEA log and save outputs.
 
@@ -371,6 +441,32 @@ def analyze(path, start_t, lat0, lon0, out_dir=None):
     ax.grid()
     fig.savefig(os.path.join(out_dir, 'sats_vs_time.png'))
     plt.close(fig)
+
+    # Velocity from RMC / VTG
+    vel = velocity_per_epoch(parse_velocity(path))
+    if not vel.empty:
+        fig, ax = plt.subplots(figsize=(6,4))
+        vel_times = vel.time_str.astype(int)
+        ax.plot(vel_times, vel.speed_kmh, '-o', markersize=3, color='tab:blue',
+                label='Speed')
+        ax.set(title="Speed & Track vs Time (RMC/VTG)",
+               xlabel="UTC HHMMSS", ylabel="Speed (km/h)")
+        ax.grid()
+        ax2 = ax.twinx()
+        ax2.plot(vel_times, vel.track_deg, '.', color='tab:orange', label='Track')
+        ax2.set_ylabel("Track, true (deg)")
+        ax2.set_ylim(0, 360)
+        fig.legend(loc='upper right', fontsize=8)
+        fig.savefig(os.path.join(out_dir, 'velocity_vs_time.png'), bbox_inches='tight')
+        plt.close(fig)
+        speed_summary = (
+            "\n\nVelocity from RMC/VTG:\n"
+            f"Mean speed: {vel.speed_kmh.mean():.2f} km/h\n"
+            f"Max speed: {vel.speed_kmh.max():.2f} km/h\n"
+        )
+        summary += speed_summary
+        with open(note_file, 'a') as nf:
+            nf.write(speed_summary)
 
     return summary
 
