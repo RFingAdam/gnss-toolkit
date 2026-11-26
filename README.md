@@ -82,6 +82,16 @@ A comprehensive **Python** suite for automated GNSS testing, logging, and perfor
    pip install pyserial pandas numpy matplotlib
    ```
 
+3. **Run the tests** (optional)
+
+   ```bash
+   pip install -r requirements.txt -r requirements-dev.txt
+   pytest
+   ```
+
+   The tests build synthetic NMEA 0183 sentences with valid checksums, so no
+   receiver or capture file is needed.
+
 ---
 
 ## Usage
