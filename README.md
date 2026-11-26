@@ -110,6 +110,32 @@ python gnss_logger.py <COM_PORT> [--mode MODE] [--duration SECONDS] [--output FI
 | `--mode`      | GNSS start mode: `cold` (default), `warm`, or `hot`             |
 | `--duration`  | Logging duration in seconds (default: `900`)                    |
 | `--output`    | Output filename for the NMEA log (default: `nmea_capture.txt`)  |
+| `--config`    | JSON config file with presets (see below); command-line values win |
+
+#### Config File (`--config`)
+
+Keep per-setup presets in a JSON file instead of retyping them:
+
+```json
+{
+  "port": "COM4",
+  "mode": "cold",
+  "duration": 900,
+  "output": "nmea_capture.txt",
+  "start_time": "123456",
+  "ref_coords": [44.0886, -87.6576],
+  "bins": 15
+}
+```
+
+```bash
+python gnss_logger.py --config bench.json            # port from the file
+python gnss_logger.py COM7 --config bench.json       # CLI port overrides it
+```
+
+All keys are optional and unknown keys are rejected. The logger uses `port`, `mode`,
+`duration` and `output`; `start_time`, `ref_coords` and `bins` are validated by
+`gnss_config.py` for the analysis side.
 
 #### Console Output
 - AT command responses & `OK` messages  

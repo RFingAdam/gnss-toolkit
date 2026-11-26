@@ -18,6 +18,8 @@ import time
 import argparse
 import serial
 
+from gnss_config import ConfigError, load_config, merge
+
 # Mapping of start modes to AT$GPSR values
 RESET_MAP = {
     'cold':  '1',
@@ -49,16 +51,48 @@ def send_at(ser, cmd, timeout=5.0):
         print(f"⚠️  No OK for '{cmd}' (timeout/error)")
     return ok
 
-def main():
+DEFAULTS = {'port': None, 'mode': 'cold', 'duration': 900,
+            'output': 'nmea_capture.txt'}
+
+
+def parse_args(p, argv=None):
+    """Parse CLI args, then fill gaps from --config and the defaults."""
+    args = p.parse_args(argv)
+    config = {}
+    if args.config:
+        try:
+            config = load_config(args.config)
+        except ConfigError as e:
+            p.error(str(e))
+    cli = {k: getattr(args, k) for k in DEFAULTS}
+    merged = merge(cli, {k: v for k, v in config.items() if k in DEFAULTS},
+                   DEFAULTS)
+    for k, v in merged.items():
+        setattr(args, k, v)
+    if not args.port:
+        p.error('the following arguments are required: port '
+                '(give it on the command line or as "port" in --config)')
+    return args
+
+
+def build_parser():
     p = argparse.ArgumentParser(description="Telit GNSS NMEA Logger")
-    p.add_argument('port', help='Serial port (e.g. COM3)')
-    p.add_argument('--mode', choices=RESET_MAP.keys(), default='cold',
-                   help='GNSS start mode (cold, warm, hot)')
-    p.add_argument('--duration', type=int, default=900,
+    p.add_argument('port', nargs='?',
+                   help='Serial port (e.g. COM3); may come from --config')
+    p.add_argument('--mode', choices=RESET_MAP.keys(), default=None,
+                   help='GNSS start mode (cold, warm, hot; default cold)')
+    p.add_argument('--duration', type=int, default=None,
                    help='Logging duration in seconds (default 900)')
-    p.add_argument('--output', default='nmea_capture.txt',
+    p.add_argument('--output', default=None,
                    help='Output file for NMEA log (default nmea_capture.txt)')
-    args = p.parse_args()
+    p.add_argument('--config', metavar='FILE',
+                   help='JSON config with port/mode/duration/output presets; '
+                        'command-line values override it')
+    return p
+
+
+def main():
+    args = parse_args(build_parser())
 
     # Open serial port
     try:
