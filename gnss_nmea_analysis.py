@@ -10,6 +10,7 @@ All outputs are saved next to the selected NMEA file:
   • error_vs_hdop.png
   • sats_vs_time.png
   • dop_vs_time.png         (when the log has GSA sentences)
+  • snr_per_satellite.png   (when the log has GSV sentences)
   • summary_notes.txt        <- added
 
 Distances computed via the Haversine formula on a WGS-84 sphere
@@ -123,6 +124,73 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+CONSTELLATION_BY_TALKER = {
+    'GP': 'GPS', 'GL': 'GLONASS', 'GA': 'Galileo', 'GB': 'BeiDou',
+    'BD': 'BeiDou', 'GQ': 'QZSS', 'GI': 'NavIC', 'GN': 'GNSS',
+}
+
+
+def parse_gsv(nmea_file):
+    """Parse GSV sentences into one row per satellite report.
+
+    GSV (NMEA 0183) fields: total messages, message number, satellites in
+    view, then up to four blocks of PRN, elevation (deg), azimuth (deg)
+    and SNR (C/N0, dB-Hz; empty when not tracking). NMEA 4.10 adds an
+    optional signal ID after the last block, which is ignored here.
+    GSV carries no time, so rows are tagged with the UTC time of the most
+    recent GGA/RMC sentence before them (empty if none yet).
+    Returns an empty DataFrame when the log has no GSV sentences.
+    """
+    time_pat = re.compile(r'^\$..(GGA|RMC),')
+    gsv_pat = re.compile(r'^\$(..)GSV,')
+    rows = []
+    last_time = ''
+    with open(nmea_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if time_pat.match(line):
+                t = line.split(',')[1].split('.')[0]
+                if len(t) == 6 and t.isdigit():
+                    last_time = t
+                continue
+            m = gsv_pat.match(line)
+            if not m:
+                continue
+            talker = m.group(1)
+            flds = line.split('*')[0].split(',')
+            blocks = flds[4:]
+            if len(blocks) % 4 == 1:  # NMEA 4.10 signal ID
+                blocks = blocks[:-1]
+            for i in range(0, len(blocks) - 3, 4):
+                prn, elev, az, snr = blocks[i:i + 4]
+                if not prn.isdigit():
+                    continue
+                rows.append({
+                    'time_str': last_time,
+                    'talker': talker,
+                    'constellation': CONSTELLATION_BY_TALKER.get(talker, talker),
+                    'prn': int(prn),
+                    'elevation': float(elev) if elev else np.nan,
+                    'azimuth': float(az) if az else np.nan,
+                    'snr': float(snr) if snr else np.nan,
+                })
+    return pd.DataFrame(rows, columns=['time_str', 'talker', 'constellation', 'prn',
+                                       'elevation', 'azimuth', 'snr'])
+
+
+def snr_per_satellite(gsv_df):
+    """Mean/max SNR and number of tracked epochs per satellite (tracked reports only)."""
+    tracked = gsv_df.dropna(subset=['snr'])
+    if tracked.empty:
+        return pd.DataFrame(columns=['constellation', 'prn', 'mean_snr', 'max_snr', 'epochs'])
+    out = (tracked.groupby(['constellation', 'prn'])['snr']
+           .agg(mean_snr='mean', max_snr='max', epochs='count')
+           .reset_index()
+           .sort_values(['constellation', 'prn'])
+           .reset_index(drop=True))
+    return out
+
+
 def compute_ttff(start_hhmmss, fix_hhmmss):
     """Seconds from GNSS start to first fix, both given as UTC HHMMSS.
 
@@ -210,6 +278,27 @@ def analyze(path, start_t, lat0, lon0, out_dir=None):
         ax.grid()
         ax.legend(fontsize=8)
         fig.savefig(os.path.join(out_dir, 'dop_vs_time.png'))
+    # Per-satellite SNR from GSV
+    snr = snr_per_satellite(parse_gsv(path))
+    if not snr.empty:
+        summary += (
+            "\n\nSNR from GSV (C/N0, dB-Hz):\n"
+            f"Satellites tracked: {len(snr)}\n"
+            f"Mean SNR: {snr.mean_snr.mean():.1f}  "
+            f"Best: {snr.max_snr.max():.0f}\n"
+        )
+        labels = [f"{c[:3]} {p}" for c, p in zip(snr.constellation, snr.prn)]
+        fig, ax = plt.subplots(figsize=(max(5, 0.35 * len(snr) + 2), 4))
+        ax.bar(range(len(snr)), snr.mean_snr, edgecolor='k', alpha=0.7, label='Mean')
+        ax.scatter(range(len(snr)), snr.max_snr, color='red', marker='_', s=120,
+                   label='Max', zorder=3)
+        ax.set_xticks(range(len(snr)))
+        ax.set_xticklabels(labels, rotation=90, fontsize=7)
+        ax.set(title="SNR per Satellite (GSV)", xlabel="Satellite",
+               ylabel="C/N0 (dB-Hz)")
+        ax.grid(axis='y')
+        ax.legend(fontsize=8)
+        fig.savefig(os.path.join(out_dir, 'snr_per_satellite.png'), bbox_inches='tight')
         plt.close(fig)
 
     # Save summary to .txt
